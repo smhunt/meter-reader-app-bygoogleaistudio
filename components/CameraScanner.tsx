@@ -176,9 +176,11 @@ export const CameraScanner: React.FC<CameraScannerProps> = ({ onScanComplete, on
         const boxW = xmax - xmin;
         const boxH = ymax - ymin;
         
-        // Add padding (20% horizontal, 30% vertical)
+        // Add padding 
+        // Width: 20% (Confirmed OK by user)
+        // Height: 60% (Increased to ensure vertical whitespace/breathing room)
         const padX = boxW * 0.2;
-        const padY = boxH * 0.4;
+        const padY = boxH * 0.6;
         
         const finalX = Math.max(0, xmin - padX);
         const finalY = Math.max(0, ymin - padY);
@@ -190,6 +192,8 @@ export const CameraScanner: React.FC<CameraScannerProps> = ({ onScanComplete, on
         
         const ctx = canvas.getContext('2d');
         if (ctx) {
+          ctx.imageSmoothingEnabled = true;
+          ctx.imageSmoothingQuality = 'high';
           ctx.drawImage(img, finalX, finalY, finalW, finalH, 0, 0, finalW, finalH);
           resolve(canvas.toDataURL('image/jpeg'));
         } else {
