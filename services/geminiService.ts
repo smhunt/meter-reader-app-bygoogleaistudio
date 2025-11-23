@@ -4,7 +4,20 @@ import { GoogleGenAI, Type } from "@google/genai";
 // NOTE: API_KEY must be provided in the environment.
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
-export const analyzeMeterImage = async (base64Image: string): Promise<{ value: string; confidence: number }> => {
+export interface BoundingBox {
+  ymin: number;
+  xmin: number;
+  ymax: number;
+  xmax: number;
+}
+
+export interface AnalysisResult {
+  value: string;
+  confidence: number;
+  boundingBox?: BoundingBox;
+}
+
+export const analyzeMeterImage = async (base64Image: string): Promise<AnalysisResult> => {
   try {
     // Detect mime type and extract data
     // Data URL format: data:[<mediatype>][;base64],<data>
@@ -52,8 +65,10 @@ export const analyzeMeterImage = async (base64Image: string): Promise<{ value: s
               - Result: "02268.85"
             
             OUTPUT FORMAT:
-            - Return a string: "XXXXX.XX" (5 integers, 2 decimal places).
-            - Example: "02268.85"
+            - Return a JSON object containing:
+              - reading: string "XXXXX.XX" (5 integers, 2 decimal places).
+              - confidence: number (0-100).
+              - box: object with ymin, xmin, ymax, xmax (bounding box of the entire detected reading area, normalized 0-1000).
             `
           }
         ]
@@ -70,9 +85,20 @@ export const analyzeMeterImage = async (base64Image: string): Promise<{ value: s
             confidence: {
               type: Type.NUMBER,
               description: "A confidence score from 0 to 100.",
+            },
+            box: {
+              type: Type.OBJECT,
+              description: "The bounding box coordinates of the detected reading area, normalized to 1000x1000.",
+              properties: {
+                ymin: { type: Type.NUMBER },
+                xmin: { type: Type.NUMBER },
+                ymax: { type: Type.NUMBER },
+                xmax: { type: Type.NUMBER }
+              },
+              required: ["ymin", "xmin", "ymax", "xmax"]
             }
           },
-          required: ["reading", "confidence"]
+          required: ["reading", "confidence", "box"]
         }
       }
     });
@@ -81,7 +107,8 @@ export const analyzeMeterImage = async (base64Image: string): Promise<{ value: s
       const result = JSON.parse(response.text);
       return {
         value: result.reading || "00000.00",
-        confidence: result.confidence || 0
+        confidence: result.confidence || 0,
+        boundingBox: result.box
       };
     }
     

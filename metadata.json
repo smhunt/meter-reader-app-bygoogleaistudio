@@ -2,6 +2,7 @@
   "name": "water meter reader app",
   "description": "A professional Water Meter Reading Progressive Web App using AI for optical character recognition.",
   "requestFramePermissions": [
-    "camera"
+    "camera",
+    "geolocation"
   ]
 }

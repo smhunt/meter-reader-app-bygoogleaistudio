@@ -36,32 +36,30 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentView, onViewCha
       )}
 
       {/* Main Content Area - Scrollable */}
-      <main className={`flex-1 overflow-y-auto ${isScanMode ? 'pb-0' : 'pb-20'} scroll-smooth relative`}>
+      <main className={`flex-1 overflow-y-auto ${isScanMode ? 'pb-0' : 'pb-24'} scroll-smooth relative`}>
         {children}
       </main>
 
       {/* Bottom Navigation - Fixed - Hidden in Scan Mode */}
       {!isScanMode && (
         <nav className="fixed bottom-0 left-0 right-0 h-16 bg-surface border-t border-slate-700 pb-safe z-30">
-          <div className="flex justify-around items-center h-full">
+          <div className="flex justify-around items-center h-full relative">
             {NAV_ITEMS.map((item) => {
               const Icon = item.icon;
               const isActive = currentView === item.id;
               
-              // Special styling for the Scan button to make it pop
+              // Special styling for the Scan button - Floating Action Button style
               if (item.id === 'scan') {
                 return (
-                  <button
-                    key={item.id}
-                    onClick={() => onViewChange(item.id)}
-                    className={`flex flex-col items-center justify-center -mt-6 w-14 h-14 rounded-full shadow-lg shadow-cyan-500/30 transition-all active:scale-95 ${
-                      isActive 
-                        ? 'bg-white text-primary' 
-                        : 'bg-primary text-white hover:bg-primaryDark'
-                    }`}
-                  >
-                    <Icon size={24} strokeWidth={2.5} />
-                  </button>
+                  <div key={item.id} className="relative -top-6">
+                     <button
+                      onClick={() => onViewChange(item.id)}
+                      className="flex items-center justify-center w-16 h-16 rounded-full bg-primary text-white shadow-[0_4px_20px_rgba(6,182,212,0.4)] hover:bg-primaryDark border-4 border-background transition-transform active:scale-95"
+                      aria-label="Start Scan"
+                    >
+                      <Icon size={28} strokeWidth={2.5} />
+                    </button>
+                  </div>
                 );
               }
 
