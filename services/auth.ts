@@ -3,6 +3,7 @@ import {
   createUserWithEmailAndPassword,
   signOut as firebaseSignOut,
   onAuthStateChanged,
+  sendPasswordResetEmail,
   User
 } from 'firebase/auth';
 import { auth, migrateReadingsToUser } from './firebase';
@@ -18,6 +19,11 @@ export const signUp = async (email: string, password: string): Promise<User> => 
   if (!auth) throw new Error('Firebase Auth not configured');
   const result = await createUserWithEmailAndPassword(auth, email, password);
   return result.user;
+};
+
+export const sendPasswordReset = async (email: string): Promise<void> => {
+  if (!auth) throw new Error('Firebase Auth not configured');
+  await sendPasswordResetEmail(auth, email);
 };
 
 export const signOut = async (): Promise<void> => {
