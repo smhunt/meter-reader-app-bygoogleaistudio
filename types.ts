@@ -1,5 +1,15 @@
 export type ViewState = 'dashboard' | 'scan' | 'history' | 'profile';
 
+export interface UserInfo {
+  uid: string;
+  email: string;
+  displayName?: string;
+  isAdmin?: boolean;
+}
+
+// Admin emails - these users have full access
+export const ADMIN_EMAILS = ['sean@ecoworks.ca'];
+
 export interface MeterReading {
   id: string;
   value: string;
@@ -7,6 +17,7 @@ export interface MeterReading {
   timestamp: number;
   imageUrl?: string;
   location?: string;
+  recordedBy?: UserInfo;
 }
 
 export interface NavItem {

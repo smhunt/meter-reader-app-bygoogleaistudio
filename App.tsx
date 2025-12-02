@@ -1,53 +1,108 @@
 import React, { useState, useEffect } from 'react';
+import { User as FirebaseUser } from 'firebase/auth';
 import { Layout } from './components/Layout';
 import { Dashboard } from './components/Dashboard';
 import { CameraScanner } from './components/CameraScanner';
 import { History } from './components/History';
-import { MeterReading, ViewState } from './types';
-import { LucideIcon, LayoutDashboard, Scan, History as HistoryIcon, User } from 'lucide-react';
+import { Login } from './components/Login';
+import { Profile } from './components/Profile';
+import { MeterReading, ViewState, UserInfo } from './types';
+import { subscribeToReadings, addReading, updateReading, deleteReading } from './services/firebase';
+import { subscribeToAuth, getUserInfo, claimExistingReadings } from './services/auth';
+import { initializePermissions } from './services/permissions';
+import { Loader2 } from 'lucide-react';
+
+interface DateFilter {
+  start: number;
+  end: number;
+  label: string;
+}
 
 const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<ViewState>('dashboard');
   const [readings, setReadings] = useState<MeterReading[]>([]);
-  
-  // Simulate initial data loading
+  const [dateFilter, setDateFilter] = useState<DateFilter | null>(null);
+  const [authLoading, setAuthLoading] = useState(true);
+  const [user, setUser] = useState<FirebaseUser | null>(null);
+  const [userInfo, setUserInfo] = useState<UserInfo | null>(null);
+
+  // Subscribe to auth state
   useEffect(() => {
-    const mockData: MeterReading[] = [
-      { id: '1', value: '02268.85', confidence: 0.98, timestamp: Date.now() - 10000000, imageUrl: '', location: 'Building A' },
-      { id: '2', value: '01258.90', confidence: 0.95, timestamp: Date.now() - 5000000, imageUrl: '', location: 'Building B' },
-      { id: '3', value: '01261.25', confidence: 0.88, timestamp: Date.now() - 1000000, imageUrl: '', location: 'Building C' },
-    ];
-    setReadings(mockData);
+    const unsubscribe = subscribeToAuth(async (firebaseUser) => {
+      setUser(firebaseUser);
+      if (firebaseUser) {
+        const info = getUserInfo(firebaseUser);
+        setUserInfo(info);
+        // If admin, migrate any unclaimed readings
+        if (info.isAdmin) {
+          const migrated = await claimExistingReadings(firebaseUser);
+          if (migrated > 0) {
+            console.log(`Migrated ${migrated} readings to ${info.email}`);
+          }
+        }
+        // Request camera/location permissions upfront (once per session)
+        initializePermissions();
+      } else {
+        setUserInfo(null);
+      }
+      setAuthLoading(false);
+    });
+    return () => unsubscribe();
   }, []);
 
-  const handleScanComplete = (newReading: MeterReading) => {
-    setReadings(prev => [newReading, ...prev]);
+  // Subscribe to real-time updates from Firebase
+  useEffect(() => {
+    if (!user) return;
+    const unsubscribe = subscribeToReadings((updatedReadings) => {
+      setReadings(updatedReadings);
+    });
+    return () => unsubscribe();
+  }, [user]);
+
+  const handleScanComplete = async (newReading: MeterReading) => {
+    // Add user info to reading
+    const readingWithUser = {
+      ...newReading,
+      recordedBy: userInfo || undefined
+    };
+    const { id, ...readingData } = readingWithUser;
+    await addReading(readingData);
     setCurrentView('history');
   };
+
+  const handleDayClick = (dayStart: number, dayEnd: number, label: string) => {
+    setDateFilter({ start: dayStart, end: dayEnd, label });
+    setCurrentView('history');
+  };
+
+  const handleClearFilter = () => {
+    setDateFilter(null);
+  };
+
+  // Show loading spinner during auth check
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <Loader2 className="w-10 h-10 text-primary animate-spin" />
+      </div>
+    );
+  }
+
+  // Show login if not authenticated
+  if (!user || !userInfo) {
+    return <Login onSuccess={() => {}} />;
+  }
 
   const renderContent = () => {
     switch (currentView) {
       case 'dashboard':
-        return <Dashboard readings={readings} onQuickScan={() => setCurrentView('scan')} />;
+        return <Dashboard readings={readings} onQuickScan={() => setCurrentView('scan')} onDayClick={handleDayClick} />;
       case 'scan':
         return <CameraScanner onScanComplete={handleScanComplete} onCancel={() => setCurrentView('dashboard')} />;
       case 'history':
-        return <History readings={readings} />;
+        return <History readings={readings} onEdit={updateReading} onDelete={deleteReading} dateFilter={dateFilter} onClearFilter={handleClearFilter} />;
       case 'profile':
-        return (
-          <div className="flex flex-col items-center justify-center h-full p-6 text-center text-slate-400">
-            <div className="w-24 h-24 bg-surface rounded-full mb-4 flex items-center justify-center">
-              <User size={48} />
-            </div>
-            <h2 className="text-xl font-bold text-white">Technician Profile</h2>
-            <p className="mt-2">ID: #8821-CTX</p>
-            <p className="text-sm mt-1">Region: North-East</p>
-            <div className="mt-8 p-4 bg-slate-900/50 rounded-lg w-full max-w-sm">
-              <p className="text-xs font-mono text-cyan-400">STATUS: ONLINE</p>
-              <p className="text-xs text-slate-500 mt-1">Sync: Up to date</p>
-            </div>
-          </div>
-        );
+        return <Profile userInfo={userInfo} />;
       default:
         return <Dashboard readings={readings} onQuickScan={() => setCurrentView('scan')} />;
     }

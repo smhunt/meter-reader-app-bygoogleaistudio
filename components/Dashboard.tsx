@@ -3,22 +3,59 @@ import { BarChart, Bar, XAxis, Tooltip, ResponsiveContainer, Cell } from 'rechar
 import { MeterReading } from '../types';
 import { Plus, TrendingUp, AlertTriangle, CheckCircle2 } from 'lucide-react';
 
+interface ChartDataPoint {
+  name: string;
+  reads: number;
+  isToday: boolean;
+  dayStart: number;
+  dayEnd: number;
+  fullDate: string;
+}
+
 interface DashboardProps {
   readings: MeterReading[];
   onQuickScan: () => void;
+  onDayClick?: (dayStart: number, dayEnd: number, label: string) => void;
 }
 
-export const Dashboard: React.FC<DashboardProps> = ({ readings, onQuickScan }) => {
-  // Aggregate data for the chart (mock logic for demo)
-  const chartData = [
-    { name: 'Mon', reads: 12 },
-    { name: 'Tue', reads: 19 },
-    { name: 'Wed', reads: 15 },
-    { name: 'Thu', reads: 22 },
-    { name: 'Fri', reads: 8 }, // current day
-  ];
+export const Dashboard: React.FC<DashboardProps> = ({ readings, onQuickScan, onDayClick }) => {
+  // Get readings from the last 7 days grouped by day
+  const getChartData = (): ChartDataPoint[] => {
+    const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    const now = new Date();
+    const last7Days: ChartDataPoint[] = [];
 
-  const todaysReads = 8;
+    for (let i = 6; i >= 0; i--) {
+      const date = new Date(now);
+      date.setDate(date.getDate() - i);
+      const dayStart = new Date(date.getFullYear(), date.getMonth(), date.getDate(), 0, 0, 0, 0).getTime();
+      const dayEnd = new Date(date.getFullYear(), date.getMonth(), date.getDate(), 23, 59, 59, 999).getTime();
+      const fullDate = date.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
+
+      const count = readings.filter(r => r.timestamp >= dayStart && r.timestamp <= dayEnd).length;
+      last7Days.push({
+        name: days[date.getDay()],
+        reads: count,
+        isToday: i === 0,
+        dayStart,
+        dayEnd,
+        fullDate
+      });
+    }
+    return last7Days;
+  };
+
+  const chartData = getChartData();
+
+  const handleBarClick = (data: ChartDataPoint) => {
+    if (onDayClick && data.reads > 0) {
+      onDayClick(data.dayStart, data.dayEnd, data.fullDate);
+    }
+  };
+
+  // Count today's readings
+  const todayStart = new Date().setHours(0, 0, 0, 0);
+  const todaysReads = readings.filter(r => r.timestamp >= todayStart).length;
   const target = 25;
   const progress = (todaysReads / target) * 100;
 
@@ -92,9 +129,18 @@ export const Dashboard: React.FC<DashboardProps> = ({ readings, onQuickScan }) =
                 contentStyle={{ backgroundColor: '#1e293b', borderColor: '#334155', color: '#fff', borderRadius: '8px' }}
                 itemStyle={{ color: '#fff' }}
               />
-              <Bar dataKey="reads" radius={[4, 4, 0, 0]}>
+              <Bar
+                dataKey="reads"
+                radius={[4, 4, 0, 0]}
+                onClick={(data) => handleBarClick(data as unknown as ChartDataPoint)}
+                className="cursor-pointer"
+              >
                 {chartData.map((entry, index) => (
-                  <Cell key={`cell-${index}`} fill={index === 4 ? '#06b6d4' : '#334155'} />
+                  <Cell
+                    key={`cell-${index}`}
+                    fill={entry.isToday ? '#06b6d4' : '#334155'}
+                    className={entry.reads > 0 ? 'cursor-pointer hover:opacity-80' : ''}
+                  />
                 ))}
               </Bar>
             </BarChart>

@@ -1,8 +1,18 @@
 import { GoogleGenAI, Type } from "@google/genai";
 
-// Initialize the client
-// NOTE: API_KEY must be provided in the environment.
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+// Lazy-initialize the client to avoid crashing on load if API key is missing
+let ai: GoogleGenAI | null = null;
+
+const getAI = () => {
+  if (!ai) {
+    const apiKey = process.env.GEMINI_API_KEY || process.env.API_KEY;
+    if (!apiKey) {
+      throw new Error("GEMINI_API_KEY is not set. Please add it to .env.local");
+    }
+    ai = new GoogleGenAI({ apiKey });
+  }
+  return ai;
+};
 
 export interface BoundingBox {
   ymin: number;
@@ -34,7 +44,7 @@ export const analyzeMeterImage = async (base64Image: string): Promise<AnalysisRe
       cleanBase64 = base64Image.replace(/^data:image\/(png|jpeg|jpg|webp);base64,/, '');
     }
 
-    const response = await ai.models.generateContent({
+    const response = await getAI().models.generateContent({
       model: "gemini-2.5-flash",
       contents: {
         parts: [
